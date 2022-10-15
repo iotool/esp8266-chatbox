@@ -55,5 +55,5 @@ Using the Chat
 
 ### Extend range by additional antenna
 
-* +5dBm by 6cm wire (dipole antenna)
-* +9dBm by 5× 3cm wire (monopole antenna)
+* +5dBm = +50% by 6cm wire (dipole antenna)
+* +9dBm = +100% by 5× 3cm wire (monopole antenna)
