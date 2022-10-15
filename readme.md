@@ -51,4 +51,7 @@ Using the Chat
 - Wemos D1 mini
 - NodeMUC
 
+### Extend range by additional antenna
 
+* +5dBm by 6cm wire (dipole antenna)
+* +9dBm by 5× 3cm wire (monopole antenna)
