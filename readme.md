@@ -10,7 +10,7 @@ Chatbox enables local communication via Wifi between smartphones and tablets.
 
 Multiple ESP devices automatically connect to each other to form a mesh network.
 
-![ESP8266 Chatbox](https://raw.githubusercontent.com/iotool/esp8266-chatbox/main/esp8266-chatbox.jpg)
+![ESP8266 Chatbox Chat](https://raw.githubusercontent.com/iotool/esp8266-chatbox/main/esp8266-chatbox-chat.jpg)
 
 ## How to use
 
@@ -45,6 +45,8 @@ Using the Chat
 - download the source code to your device
 - change the cliPwd at the source code
 - upload the firmware to ESP8266 device
+
+![ESP8266 Chatbox](https://raw.githubusercontent.com/iotool/esp8266-chatbox/main/esp8266-chatbox.jpg)
 
 ## Recommended ESP8266 devices
 
