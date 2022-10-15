@@ -55,5 +55,9 @@ Using the Chat
 
 ### Extend range by additional antenna
 
-* +5dBm = +50% by 6cm wire (dipole antenna)
-* +9dBm = +100% by 5× 3cm wire (monopole antenna)
+Note: if there is no emergency situation you have to reduce AP_POWER
+
+* +5dBm = +50% range by 6cm wire (dipole antenna)
+* +9dBm = +100% range by 5× 3cm wire (monopole antenna)
+
+I try diffent antenna hacks to extend the range. The best result I get by solder a wire direct to the antenna lane on the pcb. You need to carefully scrape off the protective varnish.
