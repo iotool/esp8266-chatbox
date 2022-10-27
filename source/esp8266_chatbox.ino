@@ -29,6 +29,7 @@
 // workaround age++ jumps
 // editable info page
 // current spike to keep powerbank on
+// create and serve files
 // 
 // This is a proof-of-concept 
 // to combine hotspot and mesh nodes.
@@ -52,6 +53,7 @@ extern "C" {
 #include <WiFiClient.h>
 #include <StreamString.h>
 #include <EEPROM.h>
+#include <LittleFS.h>
 
 /* --- configuration --- */
 
@@ -262,6 +264,42 @@ void setup() {
     MDNS.addService("http","tcp",80);
   }
   
+  // file: filesystem
+  // auto format if needed
+  if(!LittleFS.begin()){
+    Serial.println(
+      F("LittleFS error mount"));
+  } else {
+    Serial.println(F("LittleFS mount"));
+    LittleFS.mkdir("file");
+    String fn="/file/info.txt";
+    File f;
+    uint8_t fd[9]="Infotest";
+    if(!LittleFS.exists(fn)){
+      f = LittleFS.open(fn, "w");
+      if(!f){
+        Serial.println(
+          F("LittleFS error create file"));
+      } else {
+        Serial.println(
+          F("LittleFS create file"));
+        f.write(fd,8);
+        f.close();
+      }
+    }
+    Dir dir = LittleFS.openDir("/file");
+    while (dir.next()) {
+      Serial.print(dir.fileName());
+      if(dir.fileSize()) {
+        f = dir.openFile("r");  
+        Serial.print(" ");
+        Serial.println(f.size());
+      } else {
+        Serial.println();
+      }
+    }
+  }
+  
   // http: webserver
   // map path and handler
   urlHome = F("http://");
@@ -280,6 +318,7 @@ void setup() {
   httpServer.on("/info",onHttpInfo);
   httpServer.on("/infof",onHttpInfoFrm);
   httpServer.on("/infos",onHttpInfoSet);
+  httpServer.on("/file",onHttpFile);
   httpServer.on("/cli",onHttpCli);
   httpServer.begin();
 
@@ -458,6 +497,8 @@ void doReboot() {
       delay(100);
       WiFi.softAPdisconnect(true);
       delay(200);
+      yield();
+      LittleFS.end();
       yield();
       ESP.restart();
       delay(200);
@@ -1093,8 +1134,10 @@ String maskHttpArg(String id,byte lf) {
   // get CGI request parameter
   // disable line feed and html tags
   String prm = httpServer.arg(id);
-  prm.replace("<","&lt;");
-  prm.replace(">","&gt;");
+  if (lf == 0 || lf == 1) {
+    prm.replace("<","&lt;");
+    prm.replace(">","&gt;");
+  }
   if (lf == 0){
     prm.replace("\r","\n");
     prm.replace("\n"," ");
@@ -1254,7 +1297,7 @@ doHttpStreamBegin(CTYPE_HTML);
     F("-(df.ib.value.length); document.getElementById('in').innerText=cl;}</script>")); 
   doHtmlPageBody();
   httpServer.sendContent(
-    F("<h1>Chatbox</h1><hr><a href=/info>cancle (abbrechen)</a><hr><br><form name=mf action=/infos method=POST>Password:<br><input type=password name=ip maxlength=16 onChange=onInp() onkeyup=onInp()><br><br>Info:<br><textarea name=ib rows=10 cols=45 maxlength=")); httpServer.sendContent(String(INFO_MLEN-1));
+    F("<h1>Chatbox</h1><hr><a href=/info>cancle (abbrechen)</a><hr><br><form name=mf action=/infos method=POST>Authorisation:<br><input type=text name=in value=infotext size=12 maxlength=16><input type=password name=ip size=12 maxlength=16 onChange=onInp() onkeyup=onInp()><br><br>Info:<br><textarea name=ib rows=10 cols=45 maxlength=")); httpServer.sendContent(String(INFO_MLEN-1));
   httpServer.sendContent(
     F(" onChange=onInp() onkeyup=onInp()>"));
   eepromMemT eepromMem = {0};
@@ -1278,35 +1321,116 @@ void onHttpInfoSet() {
   httpServer.sendHeader(
     F("Refresh"), urlInfoRefresh
   );
+  String in = maskHttpArg("in",0);
+  if (in.length()>0) {
+    in = in.substring(0,16);
+  }
   String ip = maskHttpArg("ip",0);
   if (ip.length()>0) {
     ip = ip.substring(0,16);
   }
-  String ib = maskHttpArg("ib",1);
-  ib=ib.substring(0,INFO_MLEN);
+  String ib;
+  if (in=="infopage"){
+    ib = maskHttpArg("ib",1);
+    ib=ib.substring(0,INFO_MLEN);
+  } else {
+    ib = maskHttpArg("ib",2);
+  }
   if (ip.length()>0
    && ip==String(cliPwd)) {
-    // save
-    eepromMemT eepromMem = {0};
-    EEPROM.begin(sizeof(eepromMem));
-    eepromMem.check=0xDE49;
-    ib.toCharArray(
-      eepromMem.info,ib.length()+1
-    );
-    EEPROM.put(0, eepromMem);
-    EEPROM.commit();
-    EEPROM.end();
+    // save infotext to eeprom
+    if(in=="infotext"){
+      eepromMemT eepromMem = {0};
+      EEPROM.begin(sizeof(eepromMem));
+      eepromMem.check=0xDE49;
+      ib.toCharArray(
+        eepromMem.info,ib.length()+1
+      );
+      EEPROM.put(0, eepromMem);
+      EEPROM.commit();
+      EEPROM.end();
+    } 
+    // save as file
+    else {
+      File f = LittleFS.open(
+        "/file/"+in, "w");
+      if(!f){
+        ib=F("error: create file!");
+      } else {
+        f.write(
+          (uint8_t*)ib.c_str(),ib.length());
+        f.close();
+        ib="ok: /file?type=text&name="+in;
+      }
+    }
   } else { 
     ib = F("error: wrong password!");
   }
   String html="";
   html+=F("<html><head><meta name='viewport' content='width=device-width, initial-scale=1' /></head><body bgcolor=#003366 text=#FFFFCC link=#66FFFF vlink=#66FFFF alink=#FFFFFF><h1>Chatbox</h1><hr><a href=/info>next (weiter)</a><hr><br><pre>");
+  html+=in;
+  html+=F("<br><br>");
   html+=ib;
   html+=F("</pre></body></html>");
   httpServer.send(
     200, F("text/html"),html
   );
   html=""; ip=""; ib="";
+  requests++;
+  yield();
+}
+
+void onHttpFile() {
+  // handle /file?name=info.txt&type=text
+  // upload via info editor
+  String in = "/file/"+maskHttpArg("name",0);
+  if (in.length()>0) {
+    in = in.substring(0,22);
+  }
+  String it = maskHttpArg("type",0);
+  String text;
+  if(!LittleFS.exists(in)) {
+    text="file not found "+in;
+    httpServer.send(
+      404, F("text/plain"), text
+    );
+  } else {
+    File f = LittleFS.open(in,"r");
+    if(!f){
+      text="file not open "+in;
+      httpServer.send(
+        404, F("text/plain"), text
+      );
+    } else {
+      if(it=="html"){
+        doHttpStreamBegin(CTYPE_HTML);    
+      } else if(it=="text"){
+        doHttpStreamBegin(CTYPE_TEXT); 
+      } else {
+        doHttpStreamBegin(CTYPE_TEXT);
+        text="file open "+in+"\n\n";
+        httpServer.sendContent(text);
+      }
+      int32_t fs=f.size();
+      uint8_t fd[256];
+      while(fs>0){
+        if(fs>=255){
+          f.read(fd, 255);
+          fd[255]=0;
+          fs-=255;
+        } else {
+          f.read(fd, fs);
+          fd[fs]=0;
+          fs=0;
+        }
+        httpServer.sendContent((char*)fd);
+        yield();
+      }
+      f.close();
+      doHttpStreamEnd();
+    }
+  }
+  text=""; in=""; it="";
   requests++;
   yield();
 }
@@ -1320,7 +1444,7 @@ void onHttpCli() {
   );
   // readme
   String text= F(
-    "Version: 20221026-1351\n"
+    "Version: 20221027-1430\n"
     "/cli?cmd=login-password\n"
     "/cli?cmd=logoff\n"
     "/cli?cmd=restart\n"
