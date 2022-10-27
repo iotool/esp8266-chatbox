@@ -29,7 +29,7 @@
 // workaround age++ jumps
 // editable info page
 // current spike to keep powerbank on
-// create and serve files
+// create, serve, list and delete files
 // 
 // This is a proof-of-concept 
 // to combine hotspot and mesh nodes.
@@ -1323,7 +1323,7 @@ void onHttpInfoSet() {
   );
   String in = maskHttpArg("in",0);
   if (in.length()>0) {
-    in = in.substring(0,16);
+    in = in.substring(0,20);
   }
   String ip = maskHttpArg("ip",0);
   if (ip.length()>0) {
@@ -1350,8 +1350,18 @@ void onHttpInfoSet() {
       EEPROM.commit();
       EEPROM.end();
     } 
-    // save as file
+    // delete file
+    else if(in.startsWith("del:")){
+      in = in.substring(4,16);
+      if(!LittleFS.remove("/file/"+in)){
+        ib=F("error: can't delete file!");     
+      } else {
+        ib=F("file deleted.");
+      }
+    }
+    // save file
     else {
+      in = in.substring(0,16);
       File f = LittleFS.open(
         "/file/"+in, "w");
       if(!f){
@@ -1389,13 +1399,28 @@ void onHttpFile() {
   }
   String it = maskHttpArg("type",0);
   String text;
-  if(!LittleFS.exists(in)) {
+  File f;
+  if(in=="/file/"){
+    doHttpStreamBegin(CTYPE_TEXT); 
+    Dir dir = LittleFS.openDir("/file");
+    while (dir.next()) {
+      httpServer.sendContent(
+        "\n"+dir.fileName());
+      if(dir.fileSize()) {
+        f = dir.openFile("r");
+        httpServer.sendContent(
+          " "+String(f.size()));
+        f.close();
+      }
+    }
+    doHttpStreamEnd();
+  } else if(!LittleFS.exists(in)) {
     text="file not found "+in;
     httpServer.send(
       404, F("text/plain"), text
     );
   } else {
-    File f = LittleFS.open(in,"r");
+    f = LittleFS.open(in,"r");
     if(!f){
       text="file not open "+in;
       httpServer.send(
@@ -1444,7 +1469,7 @@ void onHttpCli() {
   );
   // readme
   String text= F(
-    "Version: 20221027-1430\n"
+    "Version: 20221027-1653\n"
     "/cli?cmd=login-password\n"
     "/cli?cmd=logoff\n"
     "/cli?cmd=restart\n"
