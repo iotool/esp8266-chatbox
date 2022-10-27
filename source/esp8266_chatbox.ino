@@ -28,6 +28,7 @@
 // mesh network by STA connect to AP
 // workaround age++ jumps
 // editable info page
+// current spike to keep powerbank on
 // 
 // This is a proof-of-concept 
 // to combine hotspot and mesh nodes.
@@ -82,6 +83,10 @@ extern "C" {
 #define MESH_TJOIN  12000// timeout
 #define MESH_DNOOP  100  // delay noop
 #define MESH_THTTP  750  // timeout
+#define SPIKE_IOD1  5    // gpio5 d1-330R-gnd
+#define SPIKE_IOD2  4    // gpio4 d2-330R-gnd
+#define SPIKE_PWOFF 4500 // ms off +2mA avg
+#define SPIKE_PWON  500  // ms on  +20mA peek
 
 // Don't change defined configuration to
 // be compartible to other mesh nodes.
@@ -189,7 +194,7 @@ void setup() {
  
   // serial debug
   // debug state, memory usage, etc
-  Serial.begin(19200);
+  Serial.begin(115200);
   Serial.println(F("boot"));
   delay(50);
 
@@ -326,6 +331,7 @@ void loop() {
     doReboot();
     doMesh();
     doUpdateChatAge();
+    doSpike();
   }
   yield();
 }
@@ -353,6 +359,41 @@ void doServer() {
         ArduinoOTA.handle();
       }
       yield();
+    }
+  }
+}
+
+/* --- powerbank --- */
+
+uint16_t spikeTimer=0;
+uint8_t spikeMode=LOW;
+    
+void doSpike() {
+  // current spike for powerbank
+  // some pb turn off on low current
+  if(SPIKE_PWON>0){
+    spikeTimer++;
+    if(spikeTimer>=SPIKE_PWOFF
+    && spikeMode==LOW){
+      spikeTimer=0;
+      spikeMode=HIGH;
+      //--- draw extra current
+      pinMode(SPIKE_IOD1,OUTPUT);
+      pinMode(SPIKE_IOD2,OUTPUT);
+      digitalWrite(SPIKE_IOD1,HIGH);
+      digitalWrite(SPIKE_IOD2,HIGH);
+      //---
+    }
+    if(spikeTimer>=SPIKE_PWON
+    && spikeMode==HIGH){
+      spikeTimer=0;
+      spikeMode=LOW;
+      //--- turn off extra current
+      digitalWrite(SPIKE_IOD1,LOW);
+      digitalWrite(SPIKE_IOD2,LOW); 
+      pinMode(SPIKE_IOD1,INPUT_PULLUP);
+      pinMode(SPIKE_IOD2,INPUT_PULLUP);
+      //---
     }
   }
 }
@@ -689,7 +730,7 @@ void doMesh() {
     // initiate scan after re-boot
     mesh.mode = MESH_SCAN;
     mesh.timerScan = 0;
-    Serial.println("mesh.init V33");
+    Serial.println("mesh.init V34");
   } else 
   if (mesh.mode == MESH_SCAN
    && millis()-mesh.timerScan
@@ -1279,7 +1320,7 @@ void onHttpCli() {
   );
   // readme
   String text= F(
-    "Version: 20221015-0948\n"
+    "Version: 20221026-1351\n"
     "/cli?cmd=login-password\n"
     "/cli?cmd=logoff\n"
     "/cli?cmd=restart\n"
