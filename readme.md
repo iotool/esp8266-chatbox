@@ -51,7 +51,7 @@ Using the Chat
 ## Recommended ESP8266 devices
 
 - Wemos D1 mini
-- NodeMUC
+- NodeMCU
 
 ### Extend range by additional antenna
 
