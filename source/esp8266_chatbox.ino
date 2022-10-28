@@ -1065,16 +1065,21 @@ void doMeshResponseEnd() {
 
 uint32_t httpTimeStart;
 
-void doHttpStreamBegin(byte ctype) {
+void doHttpStreamBegin(
+  byte ctype, int32_t length) {
   // template http begin / dynamic html
   // without content-length
   httpTimeStart = millis();
   httpServer.sendHeader(
     F("Connection"), F("close")
   );
-  httpServer.setContentLength(
-    CONTENT_LENGTH_UNKNOWN
-  );
+  if (length<0){
+    httpServer.setContentLength(
+      CONTENT_LENGTH_UNKNOWN
+    );
+  } else {
+    httpServer.setContentLength(length);
+  }
   switch(ctype){
     case CTYPE_HTML:
       httpServer.send(
@@ -1175,7 +1180,7 @@ void onHttpChat() {
   httpServer.sendHeader(
     F("Refresh"), F("8")
   );
-  doHttpStreamBegin(CTYPE_HTML);
+  doHttpStreamBegin(CTYPE_HTML,-1);
   doHtmlPageHeader();
   doHtmlPageBody();
   httpServer.sendContent(
@@ -1188,7 +1193,7 @@ void onHttpChat() {
 void onHttpChatFrm() {
   // create new char form
   // number of chars by javascript
-doHttpStreamBegin(CTYPE_HTML);
+doHttpStreamBegin(CTYPE_HTML,-1);
   doHtmlPageHeader();
   httpServer.sendContent(
     F("<script>function onInp(){var df=document.forms.mf,cl="));
@@ -1249,7 +1254,7 @@ void onHttpChatAdd() {
 void onHttpChatRaw() {
   // raw chat messages for mesh nodes
   // format is linetype with data
-  doHttpStreamBegin(CTYPE_TEXT);
+  doHttpStreamBegin(CTYPE_TEXT,-1);
   httpServer.sendContent(
     F("V1\nT"));
   httpServer.sendContent(
@@ -1262,7 +1267,7 @@ void onHttpChatRaw() {
 
 void onHttpInfo() {
   // info page
-  doHttpStreamBegin(CTYPE_HTML);
+  doHttpStreamBegin(CTYPE_HTML,-1);
   doHtmlPageHeader();
   doHtmlPageBody();
   httpServer.sendContent(
@@ -1288,7 +1293,7 @@ void onHttpInfo() {
 void onHttpInfoFrm() {
   // change info form
   // number of chars by javascript
-doHttpStreamBegin(CTYPE_HTML);
+doHttpStreamBegin(CTYPE_HTML,-1);
   doHtmlPageHeader();
   httpServer.sendContent(
     F("<script>function onInp(){var df=document.forms.mf,cl="));
@@ -1401,7 +1406,7 @@ void onHttpFile() {
   String text;
   File f;
   if(in=="/file/"){
-    doHttpStreamBegin(CTYPE_TEXT); 
+    doHttpStreamBegin(CTYPE_TEXT,-1); 
     Dir dir = LittleFS.openDir("/file");
     while (dir.next()) {
       httpServer.sendContent(
@@ -1427,28 +1432,31 @@ void onHttpFile() {
         404, F("text/plain"), text
       );
     } else {
+      int32_t fs=f.size();
       if(it=="html"){
-        doHttpStreamBegin(CTYPE_HTML);    
+        doHttpStreamBegin(CTYPE_HTML,fs);    
       } else if(it=="text"){
-        doHttpStreamBegin(CTYPE_TEXT); 
+        doHttpStreamBegin(CTYPE_TEXT,fs); 
       } else {
-        doHttpStreamBegin(CTYPE_TEXT);
+        doHttpStreamBegin(CTYPE_TEXT,-1);
         text="file open "+in+"\n\n";
         httpServer.sendContent(text);
       }
-      int32_t fs=f.size();
       uint8_t fd[256];
       while(fs>0){
         if(fs>=255){
           f.read(fd, 255);
           fd[255]=0;
+          httpServer.sendContent_P(
+            (char*)fd,255);
           fs-=255;
         } else {
           f.read(fd, fs);
           fd[fs]=0;
+          httpServer.sendContent_P(
+            (char*)fd,fs);
           fs=0;
         }
-        httpServer.sendContent((char*)fd);
         yield();
       }
       f.close();
@@ -1469,7 +1477,7 @@ void onHttpCli() {
   );
   // readme
   String text= F(
-    "Version: 20221027-1653\n"
+    "Version: 20221028-1058\n"
     "/cli?cmd=login-password\n"
     "/cli?cmd=logoff\n"
     "/cli?cmd=restart\n"
